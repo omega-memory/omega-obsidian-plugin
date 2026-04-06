@@ -1,0 +1,23 @@
+{
+  "name": "omega-obsidian-plugin",
+  "version": "0.1.0",
+  "description": "OMEGA Memory for Obsidian",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+  },
+  "keywords": ["obsidian", "memory", "semantic-search", "ai"],
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.24.0",
+    "obsidian": "latest",
+    "tslib": "^2.7.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "sql.js": "^1.11.0",
+    "@huggingface/transformers": "^4.0.0"
+  }
+}
