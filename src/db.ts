@@ -17,11 +17,12 @@ export class OmegaDB {
   }
 
   async init(): Promise<void> {
-    // Initialize sql.js with WASM from plugin directory
+    // Load WASM binary manually via Obsidian's adapter (app:// protocol can't fetch files)
     const wasmPath = normalizePath(`${this.pluginDir}/sql-wasm.wasm`);
+    const wasmBinary = await this.app.vault.adapter.readBinary(wasmPath);
 
     this.SQL = await initSqlJs({
-      locateFile: () => wasmPath,
+      wasmBinary: wasmBinary,
     });
 
     // Try to load existing DB

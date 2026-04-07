@@ -7,7 +7,12 @@
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
   },
-  "keywords": ["obsidian", "memory", "semantic-search", "ai"],
+  "keywords": [
+    "obsidian",
+    "memory",
+    "semantic-search",
+    "ai"
+  ],
   "license": "Apache-2.0",
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -17,7 +22,6 @@
     "typescript": "^5.6.0"
   },
   "dependencies": {
-    "sql.js": "^1.11.0",
-    "@huggingface/transformers": "^4.0.0"
+    "sql.js": "^1.11.0"
   }
 }

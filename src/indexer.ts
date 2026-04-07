@@ -28,38 +28,74 @@ export class VaultIndexer {
     const files = this.app.vault.getMarkdownFiles();
     this.cancelled = false;
 
-    this.onProgress?.({
-      total: files.length,
-      indexed: 0,
-      current: "",
-      status: "indexing",
-    });
+    this.onProgress?.({ total: files.length, indexed: 0, current: "Reading files...", status: "indexing" });
 
-    let indexed = 0;
+    // Phase 1: Read all files, compute hashes, identify changed files
+    const toIndex: Array<{ file: TFile; content: string; hash: string; noteId: number; chunks: string[] }> = [];
+
     for (const file of files) {
       if (this.cancelled) break;
-
       try {
-        await this.indexFile(file);
-      } catch (e) {
-        console.error(`OMEGA: Failed to index ${file.path}:`, e);
-      }
+        const content = await this.app.vault.cachedRead(file);
+        const hash = await this.computeHash(content);
+        const existing = this.db.getNoteByPath(file.path);
 
-      indexed++;
+        if (existing && existing.content_hash === hash) continue; // Skip unchanged
+
+        const noteId = this.db.upsertNote(file.path, file.basename, hash, file.stat.mtime);
+        this.db.deleteChunksForNote(noteId);
+        const chunks = this.chunkContent(content, file.basename);
+        if (chunks.length > 0) {
+          toIndex.push({ file, content, hash, noteId, chunks });
+        }
+      } catch (e) {
+        console.error(`OMEGA: Failed to read ${file.path}:`, e);
+      }
+    }
+
+    if (toIndex.length === 0 || this.cancelled) {
+      this.onProgress?.({ total: files.length, indexed: files.length, current: "", status: "ready" });
+      return;
+    }
+
+    // Phase 2: Batch embed all chunks across all files in batches of 32
+    const allChunks: string[] = [];
+    const chunkMap: Array<{ noteId: number; startIdx: number; count: number }> = [];
+
+    for (const item of toIndex) {
+      chunkMap.push({ noteId: item.noteId, startIdx: allChunks.length, count: item.chunks.length });
+      allChunks.push(...item.chunks);
+    }
+
+    this.onProgress?.({ total: files.length, indexed: files.length - toIndex.length, current: `Embedding ${allChunks.length} chunks...`, status: "indexing" });
+
+    // Embed in batches of 32 to avoid iframe message size limits
+    const batchSize = 32;
+    const allVectors: Float32Array[] = [];
+    for (let i = 0; i < allChunks.length; i += batchSize) {
+      if (this.cancelled) break;
+      const batch = allChunks.slice(i, i + batchSize);
+      const vectors = await this.embeddings.embed(batch);
+      allVectors.push(...vectors);
+
       this.onProgress?.({
-        total: files.length,
-        indexed,
-        current: file.basename,
+        total: allChunks.length,
+        indexed: Math.min(i + batchSize, allChunks.length),
+        current: `Embedding ${Math.min(i + batchSize, allChunks.length)}/${allChunks.length} chunks...`,
         status: "indexing",
       });
     }
 
-    this.onProgress?.({
-      total: files.length,
-      indexed,
-      current: "",
-      status: this.cancelled ? "idle" : "ready",
-    });
+    // Phase 3: Store all chunks with their embeddings
+    for (const mapping of chunkMap) {
+      const chunks = allChunks.slice(mapping.startIdx, mapping.startIdx + mapping.count);
+      const vectors = allVectors.slice(mapping.startIdx, mapping.startIdx + mapping.count);
+      for (let i = 0; i < chunks.length; i++) {
+        this.db.insertChunk(mapping.noteId, i, chunks[i], vectors[i]);
+      }
+    }
+
+    this.onProgress?.({ total: files.length, indexed: files.length, current: "", status: "ready" });
   }
 
   // Index a single file (checks hash to skip unchanged)
