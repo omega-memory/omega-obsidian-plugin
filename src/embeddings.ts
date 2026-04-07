@@ -134,7 +134,12 @@ export class EmbeddingEngine {
       });
     } catch (e) {
       this._loading = false;
-      throw new Error(`Failed to load embedding model: ${e}`);
+      this.dispose();
+      throw new Error(
+        `Failed to load AI model. This may be caused by no internet connection ` +
+        `(the model downloads ~17MB on first use). Please check your connection and restart Obsidian. ` +
+        `Error: ${e}`
+      );
     }
 
     this._ready = true;

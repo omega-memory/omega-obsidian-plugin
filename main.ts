@@ -180,7 +180,12 @@ export default class OmegaPlugin extends Plugin {
     } catch (e) {
       this.hideStatus();
       console.error("OMEGA: Initialization failed:", e);
-      new Notice("OMEGA: Failed to initialize. Check console for details.");
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("internet") || msg.includes("Failed to load AI")) {
+        new Notice(`OMEGA: ${msg}`, 15000);
+      } else {
+        new Notice("OMEGA: Failed to initialize. Please check your internet connection and restart Obsidian.", 10000);
+      }
     }
   }
 

@@ -62,7 +62,13 @@ OMEGA Memory works standalone with no dependencies. If you also use [OMEGA](http
 
 ## Network Usage
 
-This plugin downloads an AI embedding model (~17MB) from HuggingFace Hub on first use. The model is cached locally after download. No other network requests are made. Your notes are never sent to any external server.
+This plugin makes the following network requests:
+
+- **First use**: Downloads an AI embedding model (~17MB) from HuggingFace Hub via cdn.jsdelivr.net. Cached locally after download.
+- **First use**: Downloads sql-wasm.wasm (~644KB) from cdn.jsdelivr.net. Cached locally after download.
+- **Pro license only**: If you enter a Pro license key, it is validated once against admin.omegamax.co. The key is cached for 24 hours.
+
+Your notes are never sent to any external server. All search and indexing happens locally on your machine.
 
 ## Performance
 
@@ -70,7 +76,7 @@ This plugin downloads an AI embedding model (~17MB) from HuggingFace Hub on firs
 - Subsequent launches: ~2-5 seconds (model load from cache)
 - Search latency: <200ms per query
 - Indexing: ~32 notes per second (batched embedding)
-- Bundle size: 89KB (plus ~1MB sql-wasm.wasm)
+- Bundle size: ~91KB
 
 ## Commands
 
