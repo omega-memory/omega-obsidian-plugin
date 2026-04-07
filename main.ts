@@ -72,6 +72,15 @@ export default class OmegaPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: "cancel-indexing",
+      name: "Cancel indexing",
+      callback: () => {
+        this.indexer?.cancel();
+        new Notice("OMEGA: Indexing cancelled.");
+      },
+    });
+
+    this.addCommand({
       id: "find-contradictions",
       name: "Find contradictions in vault",
       callback: () => this.findContradictions(),
