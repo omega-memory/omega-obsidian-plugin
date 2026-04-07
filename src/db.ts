@@ -1,7 +1,8 @@
 import initSqlJs, { Database, SqlJsStatic } from "sql.js";
-import { App, normalizePath } from "obsidian";
+import { App, normalizePath, requestUrl } from "obsidian";
 
 const DB_FILENAME = "omega-index.db";
+const SQL_WASM_CDN = "https://cdn.jsdelivr.net/npm/sql.js@1.11.0/dist/sql-wasm.wasm";
 
 export class OmegaDB {
   private db: Database | null = null;
@@ -17,9 +18,21 @@ export class OmegaDB {
   }
 
   async init(): Promise<void> {
-    // Load WASM binary manually via Obsidian's adapter (app:// protocol can't fetch files)
+    // Load sql-wasm.wasm: try local first, download from CDN if missing
     const wasmPath = normalizePath(`${this.pluginDir}/sql-wasm.wasm`);
-    const wasmBinary = await this.app.vault.adapter.readBinary(wasmPath);
+    let wasmBinary: ArrayBuffer;
+
+    try {
+      wasmBinary = await this.app.vault.adapter.readBinary(wasmPath);
+    } catch {
+      // Not found locally, download from CDN and cache
+      console.log("OMEGA: Downloading sql-wasm.wasm from CDN...");
+      const resp = await requestUrl({ url: SQL_WASM_CDN });
+      wasmBinary = resp.arrayBuffer;
+      // Save to plugin dir for next time
+      await this.app.vault.adapter.writeBinary(wasmPath, wasmBinary);
+      console.log("OMEGA: sql-wasm.wasm cached locally.");
+    }
 
     this.SQL = await initSqlJs({
       wasmBinary: wasmBinary,

@@ -3,9 +3,9 @@
   "name": "OMEGA Memory",
   "version": "0.1.0",
   "minAppVersion": "1.5.0",
-  "description": "Semantic search, memory timeline, and contradiction detection for your vault. Local-first, powered by ONNX embeddings.",
+  "description": "Search your vault by meaning, rediscover forgotten notes, and detect contradictions. Local-first, powered by ONNX embeddings.",
   "author": "OMEGA",
   "authorUrl": "https://omegamax.co",
   "fundingUrl": "https://omegamax.co/pro",
-  "isDesktopOnly": false
+  "isDesktopOnly": true
 }
