@@ -71,6 +71,36 @@ export class OmegaSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.proLicenseKey)
           .setDisabled(true)
         );
+
+      // Show active Pro features
+      const activeSection = containerEl.createDiv();
+      activeSection.style.cssText = "margin-top: 8px;";
+
+      const activeTitle = activeSection.createEl("p", { text: "Active Pro features:" });
+      activeTitle.style.cssText = "font-size: 12px; color: var(--text-muted); margin-bottom: 8px;";
+
+      const activeFeatures = [
+        "Enhanced search (OMEGA's full retrieval pipeline when daemon running)",
+        "Agent Bridge (your coding agent can search your vault)",
+        "Multi-vault support (via OMEGA entity management)",
+        "Cloud sync (via your own Supabase instance)",
+        "Priority support",
+      ];
+      const list = activeSection.createEl("ul");
+      list.style.cssText = "margin: 0; padding-left: 20px; font-size: 12px; color: var(--text-normal);";
+      for (const f of activeFeatures) {
+        list.createEl("li", { text: f }).style.marginBottom = "4px";
+      }
+
+      // Manage subscription link
+      new Setting(activeSection)
+        .setName("Manage subscription")
+        .addButton(btn => btn
+          .setButtonText("Open dashboard")
+          .onClick(() => {
+            window.open("https://omegamax.co/pro/dashboard?ref=obsidian-settings");
+          })
+        );
     } else {
       // Pro upsell
       const proDesc = containerEl.createDiv();
@@ -102,9 +132,15 @@ export class OmegaSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.proLicenseKey = value.trim();
             await this.plugin.saveSettings();
-            if (this.plugin.isPro) {
-              new Notice("OMEGA Pro activated!");
-              this.display();
+            if (value.trim().startsWith("OMEGA-PRO-")) {
+              new Notice("OMEGA: Validating license...");
+              const valid = await this.plugin.validateProLicense();
+              if (valid) {
+                new Notice("OMEGA Pro activated! Enhanced search and agent bridge unlocked.");
+                this.display(); // Refresh to show Pro UI
+              } else {
+                new Notice("OMEGA: Invalid or expired license key. Check your key at omegamax.co/pro/dashboard");
+              }
             }
           })
         );

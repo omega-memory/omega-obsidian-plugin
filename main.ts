@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Plugin, TFile } from "obsidian";
+import { App, Modal, Notice, Plugin, TFile, requestUrl } from "obsidian";
 import { OmegaDB } from "./src/db";
 import { EmbeddingEngine, cosineSimilarity } from "./src/embeddings";
 import { VaultIndexer } from "./src/indexer";
@@ -30,6 +30,8 @@ export default class OmegaPlugin extends Plugin {
   indexer: VaultIndexer | null = null;
   omega: OmegaBridge | null = null;
   statusNotice: Notice | null = null;
+  _proValidated = false;
+  _proValidatedAt = 0;
   discoveryQuery: string | null = null;
   discoveryResults: Array<{ note_id: number; chunk_index: number; chunk_text: string; embedding: Float32Array; path: string; title: string; score: number }> | null = null;
 
@@ -341,6 +343,44 @@ export default class OmegaPlugin extends Plugin {
 
   get isPro(): boolean {
     return this.settings.proLicenseKey.startsWith("OMEGA-PRO-");
+  }
+
+  async validateProLicense(): Promise<boolean> {
+    const key = this.settings.proLicenseKey;
+    if (!key || !key.startsWith("OMEGA-PRO-")) {
+      this._proValidated = false;
+      return false;
+    }
+
+    // Use cached validation for 24 hours
+    if (this._proValidated && this._proValidatedAt && Date.now() - this._proValidatedAt < 86400000) {
+      return true;
+    }
+
+    // Validate against server
+    try {
+      const resp = await requestUrl({
+        url: "https://admin.omegamax.co/api/pro/auth",
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ licenseKey: key }),
+      });
+      if (resp.json?.valid || resp.json?.active) {
+        this._proValidated = true;
+        this._proValidatedAt = Date.now();
+        return true;
+      }
+    } catch {
+      // Offline: trust format check as fallback
+      if (key.startsWith("OMEGA-PRO-") && key.length > 15) {
+        this._proValidated = true;
+        this._proValidatedAt = Date.now();
+        return true;
+      }
+    }
+
+    this._proValidated = false;
+    return false;
   }
 }
 

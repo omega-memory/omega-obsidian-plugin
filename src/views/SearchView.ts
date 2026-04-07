@@ -301,6 +301,28 @@ export class SearchView extends ItemView {
     const loadingEl = this.searchResultsContainer.createDiv({ text: "Searching..." });
     loadingEl.style.cssText = "color: var(--text-faint); font-size: 13px; padding: 16px 0; text-align: center;";
 
+    // Pro + OMEGA HTTP: use OMEGA's full retrieval engine (95.4% accuracy)
+    if (this.plugin.isPro && this.plugin.omega?.mode === "http") {
+      try {
+        const limit = this.plugin.settings.searchResultLimit || 20;
+        const omegaResult = await this.plugin.omega.search(query, limit);
+        if (omegaResult) {
+          this.searchResultsContainer.empty();
+          // Show OMEGA-powered results
+          const badge = this.searchResultsContainer.createDiv();
+          badge.style.cssText = "font-size: 10px; color: #d4a843; font-family: var(--font-monospace); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.03em;";
+          badge.textContent = "Powered by OMEGA Pro";
+
+          const resultDiv = this.searchResultsContainer.createDiv();
+          resultDiv.style.cssText = "font-size: 13px; color: var(--text-normal); white-space: pre-wrap; line-height: 1.6;";
+          resultDiv.textContent = omegaResult;
+          return;
+        }
+      } catch {
+        // Fall through to standalone search
+      }
+    }
+
     // Embed query
     const queryVec = await this.plugin.embeddings.embedSingle(query);
 
