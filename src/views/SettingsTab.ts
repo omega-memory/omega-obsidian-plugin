@@ -137,7 +137,15 @@ export class OmegaSettingTab extends PluginSettingTab {
               const valid = await this.plugin.validateProLicense();
               if (valid) {
                 new Notice("OMEGA Pro activated! Enhanced search and agent bridge unlocked.");
-                this.display(); // Refresh to show Pro UI
+                this.display(); // Refresh settings UI
+                // Refresh the search sidebar to show Pro badge
+                const leaves = this.app.workspace.getLeavesOfType("omega-search");
+                for (const leaf of leaves) {
+                  const view = leaf.view;
+                  if (view && "onOpen" in view) {
+                    (view as any).onOpen();
+                  }
+                }
               } else {
                 new Notice("OMEGA: Invalid or expired license key. Check your key at omegamax.co/pro/dashboard");
               }
