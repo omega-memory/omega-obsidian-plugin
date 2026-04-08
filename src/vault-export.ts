@@ -83,14 +83,26 @@ function sanitizeFilename(name: string): string {
 
 /** Extract a readable title from memory content */
 function extractTitle(content: string, nodeId: string): string {
-  // Use first line if it looks like a title (short, no markdown headers needed)
-  const firstLine = content.split("\n")[0].trim();
-  if (firstLine.length > 0 && firstLine.length <= 120) {
+  const lines = content.split("\n").filter(l => l.trim().length > 0);
+  for (const line of lines.slice(0, 3)) {
+    const trimmed = line.trim();
+    // Skip lines that look like metadata or brackets
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) continue;
+    if (trimmed.startsWith("Source:") || trimmed.startsWith("---")) continue;
     // Strip markdown formatting
-    const cleaned = firstLine.replace(/^#+\s*/, "").replace(/\*\*/g, "").replace(/\[|\]/g, "");
-    if (cleaned.length > 0) return cleaned;
+    const cleaned = trimmed
+      .replace(/^#+\s*/, "")
+      .replace(/\*\*/g, "")
+      .replace(/^\[.*?\]\s*/, "") // Strip leading [tags]
+      .replace(/\[|\]/g, "")
+      .trim();
+    if (cleaned.length >= 10 && cleaned.length <= 120) return cleaned;
+    if (cleaned.length > 120) return cleaned.slice(0, 117) + "...";
   }
-  // Fall back to node_id
+  // Fall back to first 80 chars of content
+  const fallback = content.replace(/\n/g, " ").trim();
+  if (fallback.length > 80) return fallback.slice(0, 77) + "...";
+  if (fallback.length > 0) return fallback;
   return nodeId;
 }
 
@@ -177,13 +189,10 @@ function memoryToMarkdown(
     lines.push(`tags: [${tags.join(", ")}]`);
   }
   if (edges.length > 0) {
-    const relatedLinks = edges.map(e => {
-      const targetFile = sanitizeFilename(e.source_id === row.node_id ? e.target_id : e.source_id);
-      return `"[[${targetFile}]]"`;
-    });
     lines.push(`related:`);
-    for (const link of relatedLinks) {
-      lines.push(`  - ${link}`);
+    for (const e of edges.slice(0, 10)) {
+      const otherId = e.source_id === row.node_id ? e.target_id : e.source_id;
+      lines.push(`  - "[[${otherId}]]"`);
     }
   }
   if (row.priority && row.priority !== 3) {
@@ -201,15 +210,15 @@ function memoryToMarkdown(
   lines.push(row.content.trim());
   lines.push("");
 
-  // Related section with labeled wikilinks
+  // Related section with labeled wikilinks (using aliases to resolve by node_id)
   if (edges.length > 0) {
     lines.push("## Related");
     for (const edge of edges) {
       const isOutgoing = edge.source_id === row.node_id;
       const otherId = isOutgoing ? edge.target_id : edge.source_id;
-      const targetFile = sanitizeFilename(otherId);
       const label = edgeTypeLabel(edge.edge_type);
-      lines.push(`- [[${targetFile}]] -- ${label}`);
+      // Link via alias (node_id), Obsidian resolves aliases automatically
+      lines.push(`- [[${otherId}]] -- ${label}`);
     }
     lines.push("");
   }
@@ -707,10 +716,19 @@ export async function exportToVault(
       edgeLinksCreated += edges.length;
 
       const markdown = memoryToMarkdown(row, meta, edges, entityNames, projectNames);
-      const filename = sanitizeFilename(row.node_id) + ".md";
+      const title = extractTitle(row.content, row.node_id);
+      const baseFilename = sanitizeFilename(title);
+      // Ensure uniqueness: append short hash if filename collision
+      const filename = baseFilename + ".md";
       const filepath = path.join(outputDir, "memories", dirName, filename);
-
-      fs.writeFileSync(filepath, markdown, "utf-8");
+      // If file already exists with different node_id, append suffix
+      if (fs.existsSync(filepath)) {
+        const suffix = row.node_id.slice(-6);
+        const uniquePath = path.join(outputDir, "memories", dirName, `${baseFilename} (${suffix}).md`);
+        fs.writeFileSync(uniquePath, markdown, "utf-8");
+      } else {
+        fs.writeFileSync(filepath, markdown, "utf-8");
+      }
       exported++;
 
       if (exported % 50 === 0 || exported === total) {
