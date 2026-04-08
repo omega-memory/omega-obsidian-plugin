@@ -6,6 +6,7 @@ import { SearchView, SEARCH_VIEW_TYPE } from "./src/views/SearchView";
 import { TimelineView, TIMELINE_VIEW_TYPE } from "./src/views/TimelineView";
 import { OmegaSettingTab } from "./src/views/SettingsTab";
 import { OmegaBridge } from "./src/omega-bridge";
+import { exportToVault, type ExportResult } from "./src/vault-export";
 
 interface OmegaSettings {
   proLicenseKey: string;
@@ -13,6 +14,7 @@ interface OmegaSettings {
   searchResultLimit: number;
   nagDismissedUntil: number;
   hasCompletedOnboarding: boolean;
+  vaultExportPath: string;
 }
 
 const DEFAULT_SETTINGS: OmegaSettings = {
@@ -21,6 +23,7 @@ const DEFAULT_SETTINGS: OmegaSettings = {
   searchResultLimit: 20,
   nagDismissedUntil: 0,
   hasCompletedOnboarding: false,
+  vaultExportPath: "",
 };
 
 export default class OmegaPlugin extends Plugin {
@@ -90,6 +93,12 @@ export default class OmegaPlugin extends Plugin {
       id: "find-duplicates",
       name: "Find duplicate content across notes",
       callback: () => this.findDuplicates(),
+    });
+
+    this.addCommand({
+      id: "export-to-vault",
+      name: "Export OMEGA memories to vault",
+      callback: () => this.exportMemories(),
     });
 
     // Ribbon icon
@@ -344,6 +353,55 @@ export default class OmegaPlugin extends Plugin {
       if (!this.isPro) {
         new Notice("Pro: Automatic deduplication and knowledge consolidation. omegamax.co/pro", 8000);
       }
+    }
+  }
+
+  getExportPath(): string {
+    if (this.settings.vaultExportPath) return this.settings.vaultExportPath;
+    const os = (window as any).require("os");
+    const path = (window as any).require("path");
+    return path.join(os.homedir(), "Documents", "OMEGA");
+  }
+
+  async exportMemories(): Promise<void> {
+    if (!this.omega || this.omega.mode === "offline") {
+      new Notice("OMEGA: No OMEGA database found. Install OMEGA first.");
+      return;
+    }
+
+    const exportPath = this.getExportPath();
+    const isPro = await this.validateProLicense();
+    const notice = new Notice(`OMEGA: Exporting memories to ${exportPath}...`, 0);
+
+    try {
+      const result: ExportResult = await exportToVault(exportPath, {
+        isPro,
+        onProgress: (msg, pct) => {
+          notice.setMessage(`OMEGA: ${msg} (${pct}%)`);
+        },
+      });
+
+      notice.hide();
+
+      const summary = [
+        `OMEGA export complete!`,
+        `${result.memoriesExported} memories exported`,
+      ];
+      if (result.entitiesCreated > 0) summary.push(`${result.entitiesCreated} entity profiles`);
+      if (result.projectsCreated > 0) summary.push(`${result.projectsCreated} project indexes`);
+      if (result.mocsCreated > 0) summary.push(`${result.mocsCreated} index notes`);
+      summary.push(`Open "${exportPath}" as a vault in Obsidian.`);
+
+      if (!isPro) {
+        summary.push(`Free tier: ${result.memoriesExported} of ${this.omega.memoryCount} memories. Upgrade for full export: omegamax.co/pro`);
+      }
+
+      new Notice(summary.join("\n"), 15000);
+    } catch (e) {
+      notice.hide();
+      const msg = e instanceof Error ? e.message : String(e);
+      new Notice(`OMEGA export failed: ${msg}`, 10000);
+      console.error("OMEGA: Export failed:", e);
     }
   }
 

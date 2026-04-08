@@ -60,6 +60,43 @@ export class OmegaSettingTab extends PluginSettingTab {
         })
       );
 
+    // Vault export
+    containerEl.createEl("h3", { text: "Vault Export" });
+
+    const omegaStatus = this.plugin.omega;
+    const memCount = omegaStatus?.memoryCount || 0;
+
+    new Setting(containerEl)
+      .setName("Export path")
+      .setDesc(`Directory for the OMEGA vault. Default: ~/Documents/OMEGA/`)
+      .addText(text => text
+        .setPlaceholder(this.plugin.getExportPath())
+        .setValue(this.plugin.settings.vaultExportPath)
+        .onChange(async (value) => {
+          this.plugin.settings.vaultExportPath = value.trim();
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Export memories")
+      .setDesc(
+        memCount > 0
+          ? `Export ${this.plugin.isPro ? memCount : Math.min(20, memCount)} memories as Obsidian notes${!this.plugin.isPro ? ` (${memCount} total, Pro unlocks full export)` : ""}.`
+          : "No OMEGA database detected."
+      )
+      .addButton(btn => btn
+        .setButtonText("Export to vault")
+        .setDisabled(memCount === 0)
+        .onClick(async () => {
+          btn.setButtonText("Exporting...");
+          btn.setDisabled(true);
+          await this.plugin.exportMemories();
+          btn.setButtonText("Export to vault");
+          btn.setDisabled(false);
+        })
+      );
+
     // Pro section
     containerEl.createEl("h3", { text: "OMEGA Pro" });
 
@@ -80,6 +117,7 @@ export class OmegaSettingTab extends PluginSettingTab {
       activeTitle.style.cssText = "font-size: 12px; color: var(--text-muted); margin-bottom: 8px;";
 
       const activeFeatures = [
+        "Full vault export (all memories, entity profiles, project indexes)",
         "Enhanced search (OMEGA's full retrieval pipeline when daemon running)",
         "Agent Bridge (your coding agent can search your vault)",
         "Multi-vault support (via OMEGA entity management)",
@@ -111,10 +149,10 @@ export class OmegaSettingTab extends PluginSettingTab {
 
       const features = proDesc.createEl("ul");
       features.style.cssText = "margin: 0 0 8px 0; padding-left: 20px; font-size: 13px; color: var(--text-muted);";
+      features.createEl("li", { text: "Full vault export: all memories as interlinked Obsidian notes" });
+      features.createEl("li", { text: "Entity profiles and project indexes (auto-generated)" });
       features.createEl("li", { text: "Agent Bridge: search your vault from Claude Code and Cursor" });
-      features.createEl("li", { text: "Multi-vault support with isolated namespaces" });
       features.createEl("li", { text: "Cloud sync via your own Supabase" });
-      features.createEl("li", { text: "PDF and image indexing" });
 
       const proLink = proDesc.createEl("a", {
         text: "$19/mo at omegamax.co/pro",
